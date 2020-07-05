@@ -16,8 +16,16 @@ class AccountView: UIViewController, UITableViewDelegate, UITableViewDataSource 
     var handle: AuthStateDidChangeListenerHandle?
     var FireStore: Firestore!
     let dataTitle: [String] = ["氏名","メールアドレス","所属"]
-    let infoTitle: [String] = ["Activity1","Physics1","Japanese1"]
+    let classTitles: [String] = [
+        "Activity1","Activity2","Activity3",
+        "Japanese1","Japanese2","Japanese2",
+        "Physics1","Physics2","Physics3",
+        "Differencial and Integral1","Differencial and Integral2",
+        "EnglishA1","EnglishA2","EnglishA3",
+        "PhysicalEducation"
+    ]
     let info: [String] = ["欠課数： 0/30","欠課数： 3/30","欠課数： 0/30"]
+    
     let params = ["詳細情報", "出席確認"]
     
     
@@ -31,9 +39,11 @@ class AccountView: UIViewController, UITableViewDelegate, UITableViewDataSource 
         switch segment.selectedSegmentIndex {
         case 0:
             dataTable.tag = 0
+            dataTable.isScrollEnabled = false
             break
         case 1:
             dataTable.tag = 1
+            dataTable.isScrollEnabled = true
             break
         default:
             break
@@ -46,7 +56,7 @@ class AccountView: UIViewController, UITableViewDelegate, UITableViewDataSource 
         case 0:
             return dataTitle.count
         case 1:
-            return infoTitle.count
+            return classTitles.count
         default:
             break
         }
@@ -68,7 +78,7 @@ class AccountView: UIViewController, UITableViewDelegate, UITableViewDataSource 
                         cell.label.text = user.email
                         break
                     case 2:
-                        cell.label.text = "総合工学科Ⅱ類 ロボティクスコース ３年"
+                        cell.label.text = UserDefaults.standard.string(forKey: "BelongingClass")
                         break
                     default :
                         break
@@ -77,8 +87,26 @@ class AccountView: UIViewController, UITableViewDelegate, UITableViewDataSource 
             }
             return cell
         case 1:
-            cell.title.text = self.infoTitle[indexPath.row]
-            cell.label.text = self.info[indexPath.row]
+            FireStore = Firestore.firestore()
+            handle = Auth.auth().addStateDidChangeListener { (auth, user) in
+                if let user = user {
+                    let uid = user.displayName!
+                    self.FireStore.collection("students").document(uid).getDocument{(document, error) in
+                        if let document = document, document.exists {
+                            let dataDescription = document.data()! as! Dictionary<String, Int>
+                            print(self.classTitles[1])
+                            print(dataDescription[self.classTitles[1]]!)
+                            if dataDescription[self.classTitles[indexPath.row]] == nil {
+                                cell.title.text = self.classTitles[indexPath.row]
+                                cell.label.text = "No Data"
+                            } else {
+                                cell.title.text = self.classTitles[indexPath.row]
+                                cell.label.text = String(describing: dataDescription[self.classTitles[indexPath.row]]!) + " / 35"
+                            }
+                        } else { print("Document does not exist") }
+                    }
+                }
+            }
             return cell
         default:
             break
@@ -100,9 +128,12 @@ class AccountView: UIViewController, UITableViewDelegate, UITableViewDataSource 
     }
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(true)
+        FireStore = Firestore.firestore()
         handle = Auth.auth().addStateDidChangeListener { (auth, user) in
             if let user = user {
+                let uid = user.displayName!
                 self.AccountImageView.image = self.getImageByUrl(url: user.photoURL)
+                print(uid)
             } else { return }
         }
     }
@@ -119,12 +150,11 @@ class AccountView: UIViewController, UITableViewDelegate, UITableViewDataSource 
         
         
         
-        
-        
-        
         AccountImageView.layer.masksToBounds = true
         AccountImageView.layer.cornerRadius = (self.view.frame.width / 3)
         AccountImageView.backgroundColor = UIColor(red: 193/255, green: 228/255, blue: 233/255, alpha: 1)
+        AccountImageView.layer.borderColor = UIColor.darkGray.cgColor
+        AccountImageView.layer.borderWidth = 0.5
         self.view.addSubview(AccountImageView)
         
         
@@ -134,11 +164,11 @@ class AccountView: UIViewController, UITableViewDelegate, UITableViewDataSource 
         dataSelecter.backgroundColor = .white
         dataSelecter.setTitleTextAttributes([
             NSAttributedString.Key.font : UIFont(name: "HirakakuProN-W6", size: 14.0)!,
-            NSAttributedString.Key.foregroundColor: UIColor.white
+            NSAttributedString.Key.foregroundColor: UIColor.darkGray
             ], for: .selected)
         dataSelecter.setTitleTextAttributes([
             NSAttributedString.Key.font : UIFont(name: "HiraKakuProN-W3", size: 14.0)!,
-            NSAttributedString.Key.foregroundColor: UIColor(red: 0.30, green: 0.49, blue: 0.62, alpha: 1.0)
+            NSAttributedString.Key.foregroundColor: UIColor.lightGray
             ], for: .normal)
         dataSelecter.selectedSegmentIndex = 0
         dataSelecter.addTarget(self, action: #selector(segmentChanged(_:)), for: UIControl.Event.valueChanged)
@@ -150,10 +180,11 @@ class AccountView: UIViewController, UITableViewDelegate, UITableViewDataSource 
         dataTable.delegate = self
         dataTable.dataSource = self
         dataTable.backgroundColor = .white
-        dataTable.separatorInset = .zero
-        dataTable.separatorStyle = .none
-        dataTable.isScrollEnabled = false
+        dataTable.isScrollEnabled = true
+        dataTable.allowsSelection = false
         dataTable.rowHeight = dataTable.frame.height / 5
+        dataTable.backgroundColor = .white
+        dataTable.separatorStyle = .none
         dataTable.register(dataTableCell.self, forCellReuseIdentifier: NSStringFromClass(dataTableCell.self))
         self.view.addSubview(dataTable)
         
@@ -165,6 +196,12 @@ class AccountView: UIViewController, UITableViewDelegate, UITableViewDataSource 
         self.navigationController?.navigationBar.tintColor = .black
         self.navigationController?.navigationBar.titleTextAttributes = [.foregroundColor: UIColor.black]
         self.view.backgroundColor = .white
+        
+        
+        
+        
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.dataTable.reloadData() }
     }
 }
 
